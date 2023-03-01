@@ -5,8 +5,8 @@ num_queues=${1:-$nproc}
 nic=$(ip l | grep -Po "enp94.+(?=:)")
 qlen=2048
 
-#echo "Setting NIC queue length to $qlen"
-#sudo ethtool -G $nic rx $qlen tx $qlen
+echo "Setting NIC queue length to $qlen"
+sudo ethtool -G $nic rx $qlen tx $qlen
 
 echo "Setting number of NIC queues to $num_queues"
 sudo ethtool -L $nic combined $num_queues
@@ -23,19 +23,16 @@ for i in $(seq 0 $((nproc - 1))); do
 done
 i=0
 for irq in ${irqs[@]}; do
-    map=$(printf "%x" $((2**$i)))
+    map_decimal=$((2**i))
+    map=$(printf "%x" $map_decimal)
     if (( ${#map} > 8 )); then
         map=$(sed -re 's/(.+)(........)/\1,\2/' <<< $map)
     fi
 
     sudo sh -c "echo $map > /proc/irq/$irq/smp_affinity"
-    echo "    irq-$irq (${irqnames[$i]}) -> $map"
+    cpu=$(printf "%.0f" $(echo "l($map_decimal)/l(2)" | bc -l))
+    echo "    irq-$irq (${irqnames[$i]}) -> $map (cpu $cpu)"
     i=$(( (i+1) % nproc ))
-    # if (( $num_queues == $nproc)); then
-    #     i=$(( ($i+1) % $nproc ))
-    # else
-    #     i=$(( ($i+2) % $nproc ))
-    # fi
     if (( $i >= $num_queues )); then break; fi
 done
 
@@ -50,16 +47,14 @@ echo "Setting RPS cpu maps"
 N=$(find /sys/class/net/$nic/queues -iname rps_cpus | wc -l)
 for i in $(seq 0 $(($num_queues-1))); do
     f=/sys/class/net/$nic/queues/rx-$i/rps_cpus
-    if [[ $(($i % 2)) -eq 0 ]]; then
+    if (( i % 2 == 0 )); then
         map="55,55555555"
     else
         map="aa,aaaaaaaa"
     fi
     # map=00,00000555 # RPS on first 5 cores
-    # map=00,00000015
     # map=55,40000000 # RPS on last 5 cores
     map=0
-    # map="ff,ffffffff"
     if (( $num_queues == 1 )); then
         map=0
     fi
