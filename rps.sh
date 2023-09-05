@@ -2,7 +2,9 @@
 
 nproc=$(nproc)
 num_queues=${1:-$nproc}
-nic=$(ip l | grep -Po "enp94.+(?=:)")
+(( num_queues == nproc )) && cpu_step=1 || cpu_step=2
+nic="enp129s0f0np0"
+pci="pci:0000:81:00.0"
 qlen=2048
 
 echo "Setting NIC queue length to $qlen"
@@ -13,17 +15,17 @@ sudo ethtool -L $nic combined $num_queues
 
 echo "Fixing RSS queue-to-cpu map"
 keyword="mlx5_comp"
-if [[ $nic == "eno1" ]]; then
-    keyword="eno1-TxRx-"
-fi
+# if [[ $nic == "eno1" ]]; then keyword="eno1-TxRx-"; fi
 for i in $(seq 0 $((nproc - 1))); do
-    irq=$(cat /proc/interrupts | grep -E "${keyword}${i}(@.+)?$" | awk '{ print $1 }' | cut -d: -f1)
+    irq=$(grep -E "${keyword}${i}@${pci}$" /proc/interrupts | awk '{ print $1 }' | cut -d: -f1)
     irqnames[$i]="${keyword}${i}"
     irqs[$i]=$irq
 done
+
 i=0
+core=0
 for irq in ${irqs[@]}; do
-    map_decimal=$((2**i))
+    map_decimal=$((2**core))
     map=$(printf "%x" $map_decimal)
     if (( ${#map} > 8 )); then
         map=$(sed -re 's/(.+)(........)/\1,\2/' <<< $map)
@@ -32,7 +34,8 @@ for irq in ${irqs[@]}; do
     sudo sh -c "echo $map > /proc/irq/$irq/smp_affinity"
     cpu=$(printf "%.0f" $(echo "l($map_decimal)/l(2)" | bc -l))
     echo "    irq-$irq (${irqnames[$i]}) -> $map (cpu $cpu)"
-    i=$(( (i+1) % nproc ))
+    i=$(( i + 1 ))
+    core=$(( (core + cpu_step) % nproc ))
     if (( $i >= $num_queues )); then break; fi
 done
 
@@ -47,11 +50,11 @@ echo "Setting RPS cpu maps"
 N=$(find /sys/class/net/$nic/queues -iname rps_cpus | wc -l)
 for i in $(seq 0 $(($num_queues-1))); do
     f=/sys/class/net/$nic/queues/rx-$i/rps_cpus
-    if (( i % 2 == 0 )); then
-        map="55,55555555"
-    else
-        map="aa,aaaaaaaa"
-    fi
+    # if (( i % 2 == 0 )); then
+    #     map="55,55555555"
+    # else
+    #     map="aa,aaaaaaaa"
+    # fi
     # map=00,00000555 # RPS on first 5 cores
     # map=55,40000000 # RPS on last 5 cores
     map=0
