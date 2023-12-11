@@ -40,10 +40,8 @@ def main():
     bytes2 = int(tx_bytes.read_text())
 
     pkt_rate = (tx2 - tx1) // delay
-    print(f"pkt_rate: {pkt_rate:,}")
-
-    bytes_rate = (bytes2 - bytes1) // delay // 1024**2
-    print(f"\t\tbyte_rate: {bytes_rate:,} MB/s")
+    bytes_rate = (bytes2 - bytes1) * 8 / delay / 1024**3
+    print(f"{pkt_rate:11,} pkts, {bytes_rate:5.2f} Gbps")
 
 
 if __name__ == "__main__":

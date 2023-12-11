@@ -30,24 +30,26 @@ def main():
 
     rx_packets = Path(f"/sys/class/net/{netdev}/statistics/rx_packets")
     rx_dropped = Path(f"/sys/class/net/{netdev}/statistics/rx_dropped")
+    rx_bytes = Path(f"/sys/class/net/{netdev}/statistics/rx_bytes")
 
     rx1 = int(rx_packets.read_text())
     drop1 = int(rx_dropped.read_text())
+    bytes1 = int(rx_bytes.read_text())
 
     time.sleep(delay)
 
     rx2 = int(rx_packets.read_text())
     drop2 = int(rx_dropped.read_text())
+    bytes2 = int(rx_bytes.read_text())
 
     pkt_rate = (rx2 - rx1) // delay
-    print(f"pkt_rate: {pkt_rate:,}")
-
-    if frags > 1:
-        msg_rate = pkt_rate // frags
-        print(f"msg_rate: {msg_rate:,}")
-
     drop_rate = (drop2 - drop1) // delay
-    print(f"drop_rate: {drop_rate:,}")
+    byte_rate = (bytes2 - bytes1) * 8 / delay / 1024**3
+    print(f"{pkt_rate:11,} pkts, {drop_rate:10,} drops, {byte_rate:5.2f} Gbps")
+
+    # if frags > 1:
+    #     msg_rate = pkt_rate // frags
+    #     print(f"msg_rate: {msg_rate:,}")
 
 
 if __name__ == "__main__":
