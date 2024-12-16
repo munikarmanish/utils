@@ -3,6 +3,9 @@
 import sys
 import re
 
+ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+
+
 def increment_bw_unit(unit: str):
     if unit.lower() == 'k':
         return 'M'
@@ -16,8 +19,9 @@ if __name__ == "__main__":
     msg_rate, bandwidth, pkt_rate, msg_size = 0, 0, 0, 1472
 
     for line in sys.stdin:
+        line = ansi_escape.sub('', line)
         # count msg rate
-        match = re.search(r'Summary: Message Rate is (\d+)', line)
+        match = re.search(r'Summary: Message Rate is (\d+) \[msg/sec\]', line)
         if match:
             msg_rate += int(match.group(1))
 
