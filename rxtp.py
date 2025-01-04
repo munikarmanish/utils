@@ -7,7 +7,7 @@ from pathlib import Path
 
 def parse_arguments():
     if len(sys.argv) < 2:
-        print("Usage: rxtp.py device [delay] [fragments]", file=sys.stderr)
+        print("Usage: rxtp.py device [delay]", file=sys.stderr)
         sys.exit(1)
 
     netdev = sys.argv[1]
@@ -15,19 +15,12 @@ def parse_arguments():
     try:
         delay = int(sys.argv[2])
     except IndexError:
-        delay = 5
+        delay = 1
 
-    try:
-        frags = int(sys.argv[3])
-    except IndexError:
-        frags = 1
-
-    return netdev, delay, frags
+    return netdev, delay
 
 
-def main():
-    netdev, delay, frags = parse_arguments()
-
+def print_stats(netdev, delay):
     rx_packets = Path(f"/sys/class/net/{netdev}/statistics/rx_packets")
     rx_dropped = Path(f"/sys/class/net/{netdev}/statistics/rx_dropped")
     rx_bytes = Path(f"/sys/class/net/{netdev}/statistics/rx_bytes")
@@ -45,12 +38,10 @@ def main():
     pkt_rate = (rx2 - rx1) // delay
     drop_rate = (drop2 - drop1) // delay
     byte_rate = (bytes2 - bytes1) * 8 / delay / 1024**3
-    print(f"{pkt_rate:11,} pkts, {drop_rate:10,} drops, {byte_rate:5.2f} Gbps")
-
-    # if frags > 1:
-    #     msg_rate = pkt_rate // frags
-    #     print(f"msg_rate: {msg_rate:,}")
+    print(f"{pkt_rate:11,} pkts, {byte_rate:5.2f} Gbps, {drop_rate:10,} drops")
 
 
 if __name__ == "__main__":
-    main()
+    netdev, delay = parse_arguments()
+    while True:
+        print_stats(netdev, delay)
