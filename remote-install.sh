@@ -1,35 +1,37 @@
 #!/bin/bash
 #
-# Install the deb file on manish@seir7
+# Install specific kernel version on some remote host
 
 print_usage() {
-    echo "Usage:  remote-install.sh <version> <build>"
+    echo "Usage:  remote-install.sh <ssh-host> <version> <build>"
     exit 1
 }
 
-if (( $# != 2 )) || [[ $1 == "-h" ]] || [[ $1 == "--help" ]]; then
+if (( $# != 3 )) || [[ $1 == "-h" ]] || [[ $1 == "--help" ]]; then
     print_usage
 fi
 
+host=$1
+kver=$2
+kbld=$3
 
-version=$1
-build=$2
-kernel_deb="$HOME/code/linux/linux-image-${version}_${version}-${build}_amd64.deb"
-header_deb="$HOME/code/linux/linux-headers-${version}_${version}-${build}_amd64.deb"
-debug_deb="$HOME/code/linux/linux-image-${version}-dbg_${version}-${build}_amd64.deb"
+localdir="$HOME/code/linux"
+remotdir="code/linux"
 
-kversion=$(echo $kernel_deb | grep -Po "(?<=linux-image-).+(?=_.+_amd64\.deb)")
-echo -e "\n:: Deb: ${kernel_deb}\n:: Kernel version: ${kversion}"
-remote_kernel_deb="code/linux/${kversion}.deb"
-remote_header_deb="code/linux/${kversion}-headers.deb"
-remote_debug_deb="code/linux/${kversion}-debug.deb"
+img="$localdir/linux-image-${kver}_${kver}-${kbld}_amd64.deb"
+hdr="$localdir/linux-headers-${kver}_${kver}-${kbld}_amd64.deb"
+dbg="$localdir/linux-image-${kver}-dbg_${kver}-${kbld}_amd64.deb"
 
-echo -e "\n:: Copying the deb files to seir7"
-rsync -ruvh "${kernel_deb}" "manish@seir7:${remote_kernel_deb}"
+rimg="$remotdir/${img##*/}"
+rhdr="$remotdir/${hdr##*/}"
+rdbg="$remotdir/${dbg##*/}"
+
+echo ":: Copying the deb files to ${host}"
+rsync -ruvh "${img}" "${host}:${rimg}"
 (( $? != 0 )) && exit 1
-[[ -f $header_deb ]] && rsync -ruvh "${header_deb}" "manish@seir7:${remote_header_deb}"
-[[ -f $debug_deb ]] && rsync -ruvh "${debug_deb}" "manish@seir7:${remote_debug_deb}"
+[[ -f $hdr ]] && rsync -ruvh "${hdr}" "${host}:${rhdr}"
+[[ -f $dbg ]] && rsync -ruvh "${dbg}" "${host}:${rdbg}"
 
-echo ":: Installing kernel ${kversion} on seir7"
-ssh -t manish@seir7 bin/install-kernel.sh "${kversion}"
+echo ":: Installing kernel ${kver}-${kbld} on ${host}"
+ssh -t $host bin/install-kernel.sh $kver $kbld
 
